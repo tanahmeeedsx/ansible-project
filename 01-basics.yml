@@ -1,0 +1,19 @@
+---
+- name: Ansible basics demo
+  hosts: web
+  become: true
+
+  tasks:
+    - name: Show hostname
+      ansible.builtin.command: hostname
+      register: hostname_result
+      changed_when: false
+
+    - name: Print hostname
+      ansible.builtin.debug:
+        msg: "Connected to {{ inventory_hostname }} -> {{ hostname_result.stdout }}"
+
+    - name: Install curl
+      ansible.builtin.package:
+        name: curl
+        state: present

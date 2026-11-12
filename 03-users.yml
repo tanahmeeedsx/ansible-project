@@ -1,0 +1,18 @@
+---
+- name: Manage platform users
+  hosts: web
+  become: true
+
+  vars:
+    platform_users:
+      - devops1
+      - devops2
+
+  tasks:
+    - name: Ensure platform users exist
+      ansible.builtin.user:
+        name: "{{ item }}"
+        shell: /bin/bash
+        state: present
+        create_home: true
+      loop: "{{ platform_users }}"

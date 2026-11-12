@@ -1,0 +1,25 @@
+---
+- name: Demonstrate tags
+  hosts: web
+  become: true
+
+  tasks:
+    - name: Install Nginx
+      ansible.builtin.package:
+        name: nginx
+        state: present
+      tags: [packages]
+
+    - name: Deploy website
+      ansible.builtin.template:
+        src: templates/index.html.j2
+        dest: /var/www/html/index.html
+        mode: "0644"
+      tags: [deploy]
+
+    - name: Ensure Nginx is running
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: true
+      tags: [service]
