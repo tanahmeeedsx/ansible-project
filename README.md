@@ -1,107 +1,201 @@
-# bongoDev Ansible Classroom Kit
+<p align="center"><img src="https://img.shields.io/badge/ANSIBLE-EE0000?style=for-the-badge&logo=ansible&logoColor=white" alt="Ansible logo"></p>
+<h1 align="center">AWS EC2 Configuration Management with Ansible</h1>
+<p align="center">
+<img src="https://img.shields.io/badge/Ansible-Automation-EE0000?style=flat-square&logo=ansible&logoColor=white">
+<img src="https://img.shields.io/badge/Terraform-Infrastructure-7B42BC?style=flat-square&logo=terraform&logoColor=white">
+<img src="https://img.shields.io/badge/AWS-EC2-FF9900?style=flat-square&logo=amazonaws&logoColor=white">
+<img src="https://img.shields.io/badge/Ubuntu-Linux-E95420?style=flat-square&logo=ubuntu&logoColor=white">
+<img src="https://img.shields.io/badge/SSH-Agentless-222222?style=flat-square&logo=gnu-bash&logoColor=white">
+</p>
 
-### Prerequisites:
-- Create 3 machines on Ec2: 1 control node and 2 managed nodes
-- Ansible on the control machine
-- Two Ubuntu servers reachable over SSH
-- Make sure same SSH key on both servers
-- Port 22 allowed from instructor machine
-- Port 80 allowed for the web demo
+## Overview
 
-### On Control/Master Machine/Node
+This project demonstrates infrastructure provisioning and configuration management on AWS using **Terraform and Ansible**.
 
-```bash
-$ sudo apt update && sudo apt upgrade -y
-$ sudo apt install software-properties-common -y (Install required dependencies)
-$ sudo add-apt-repository --yes --update ppa:ansible/ansible
+A central Ansible Control Node manages four Ubuntu EC2 Managed Nodes over SSH. Ansible inventory defines the target machines, while reusable playbooks automate package installation, user management, Nginx deployment, service state, and configuration consistency.
+
+The lab demonstrates **idempotency** and **configuration drift remediation**: after Nginx is manually stopped on one managed node, running the playbook restores the desired service state without changing healthy nodes.
+
+## Tech Stack
+
+| Technology | Purpose |
+|---|---|
+| AWS EC2 | Control and managed compute instances |
+| Terraform | Provisions the two additional managed EC2 nodes and their security group |
+| Ansible | Agentless configuration management and automation |
+| Ubuntu | Operating system on EC2 instances |
+| SSH | Secure communication from the control node |
+| YAML | Ansible inventory variables and playbooks |
+| Jinja2 | Dynamic Nginx index page template |
+| Nginx | Web server deployed across managed nodes |
+| Git & GitHub | Version control and documentation |
+
+## Architecture
+
+```mermaid
+flowchart TB
+  T[Terraform] -. provisions .-> W3[web3 EC2]
+  T -. provisions .-> W4[web4 EC2]
+  A[Ansible Control Node<br/>Ubuntu EC2] -->|SSH / Ansible| W1[web1 Managed Node]
+  A -->|SSH / Ansible| W2[web2 Managed Node]
+  A -->|SSH / Ansible| W3
+  A -->|SSH / Ansible| W4
+  W1 --> N1[Nginx]
+  W2 --> N2[Nginx]
+  W3 --> N3[Nginx]
+  W4 --> N4[Nginx]
 ```
-<i>PPA: `Please include Ansible's official repository when checking for available packages.` </i>
 
-Update the package list again and install Ansible:
-```bash
-$ sudo apt update
-$ sudo apt install ansible -y
-$ ansible --version
+| Node | Role | Provisioning |
+|---|---|---|
+| Control Node | Runs Ansible and connects to managed nodes | Existing EC2 instance |
+| web1 | Managed Ubuntu server running Nginx | Existing EC2 instance |
+| web2 | Managed Ubuntu server running Nginx | Existing EC2 instance |
+| web3 | Managed Ubuntu server running Nginx | Created with Terraform |
+| web4 | Managed Ubuntu server running Nginx | Created with Terraform |
+
+Terraform in this repository describes the two additional managed nodes (web3 and web4) used in the lab. The Control Node and original web1/web2 instances were already present.
+
+## Folder Structure
+
+```text
+ansible-project/
+├── 01-basics.yml
+├── 02-webserver.yml
+├── 03-users.yml
+├── 04-tags.yml
+├── ansible.cfg
+├── inventory.ini
+├── CHEATSHEET.md
+├── group_vars/
+│   └── web.yml
+├── templates/
+│   └── index.html.j2
+└── terraform/
+    ├── main.tf
+    ├── variables.tf
+    ├── outputs.tf
+    ├── terraform.tfvars.example
+    └── .gitignore
 ```
-You should see similar:
-```bash
-ansible [core 2.21.3]
-  config file = /etc/ansible/ansible.cfg
-  configured module search path = ['/home/ubuntu/.ansible/plugins/modules', '/usr/share/ansible/plugins/modules']
-  ansible python module location = /usr/lib/python3/dist-packages/ansible
-  ansible collection location = /home/ubuntu/.ansible/collections:/usr/share/ansible/collections
-  executable location = /usr/bin/ansible
-  python version = 3.14.4 (main, Jun 18 2026, 14:25:02) [GCC 15.2.0] (/usr/bin/python3)
-  jinja version = 3.1.6
-  pyyaml version = 6.0.3 (with libyaml v0.2.5)
-  ```
 
-Now, public_key is available in all machines but private_key is in your local computer. To connect from ansible-master to other machines, copy .pem (private key) to ansible-master machine/node
+## Implementation Scenarios
 
-## In master Node
-```bash
-$ mkdir keys
-$ cd keys
+### 1. Prepare the Ansible Control Node
+
+Ansible is installed on the Control Node. The SSH private key is stored securely on that machine and referenced from the inventory configuration. Never commit private keys or credentials.
+
+### 2. Define four managed nodes in inventory
+
+The web group contains all four managed nodes. Group variables define the SSH user and private-key path.
+
+```ini
+[web]
+web1 ansible_host=WEB1_PUBLIC_IP
+web2 ansible_host=WEB2_PUBLIC_IP
+web3 ansible_host=WEB3_PUBLIC_IP
+web4 ansible_host=WEB4_PUBLIC_IP
+
+[web:vars]
+ansible_user=ubuntu
+ansible_ssh_private_key_file=/home/ubuntu/keys/YOUR_KEY.pem
 ```
 
-## From Local Terminal
+The committed inventory uses placeholders. Replace them with your own addresses and key path on the Control Node.
 
-```bash
-scp -i "<your-local-private-key-file-name-to-be-copied-to-ec2>.pem" <your-local-private-key-file>.pem ubuntu@ec2-44-251-22-118.us-west-2.compute.amazonaws.com:/home/ubuntu/keys
-```
-ubuntu@ec2-44-251-22-118.us-west-2.compute.amazonaws.com = your Ec2 connection string
+### 3. Verify SSH connectivity
 
-
-Update namaged node IPs in `inventory.ini`, then run:
+Ansible uses SSH to communicate with managed nodes; no Ansible agent is required on those machines.
 
 ```bash
 ansible-inventory --graph
 ansible all -m ping
 ansible web -m command -a "hostname"
-ansible-playbook 01-basics.yml
+```
+
+### 4. Configure all four nodes with playbooks
+
+| Playbook | Purpose |
+|---|---|
+| 01-basics.yml | Shows host information and ensures curl is installed |
+| 02-webserver.yml | Updates APT, installs Nginx, deploys the Jinja2 website, and enables/starts Nginx |
+| 03-users.yml | Creates the configured platform users |
+| 04-tags.yml | Demonstrates package, deploy, and service tasks using tags |
+
+Run the main configuration playbook:
+
+```bash
+ansible-playbook 02-webserver.yml
+```
+
+### 5. Verify idempotency
+
+Run the same playbook again:
+
+```bash
+ansible-playbook 02-webserver.yml
+```
+
+When all nodes already match the declared configuration, Ansible reports changed=0.
+
+### 6. Simulate and repair configuration drift
+
+Stop Nginx manually on web3:
+
+```bash
+ssh -i /path/to/key.pem ubuntu@WEB3_PRIVATE_IP "sudo systemctl stop nginx"
+```
+
+Reapply the desired configuration from the Control Node:
+
+```bash
+ansible-playbook 02-webserver.yml
+ansible web -m command -a "systemctl is-active nginx"
+```
+
+Ansible detects that Nginx is not running on web3 and starts it again. Healthy nodes remain unchanged.
+
+## Problems & Solutions
+
+| Challenge | Resolution |
+|---|---|
+| SSH connectivity | Configured inventory addresses, Ubuntu SSH user, and Control Node key path |
+| Secure SSH access | Restricted managed-node SSH ingress to the Control Node security group |
+| Repeated manual configuration | Used playbooks to apply consistent configuration to all four nodes |
+| Host-specific web page | Used Jinja2 and inventory_hostname |
+| Unnecessary repeated changes | Verified idempotency with changed=0 on a second run |
+| Nginx stopped on one node | Reapplied the playbook to restore the required service state |
+| Terraform state and secret exposure | Excluded state, local tfvars, and credential files using .gitignore |
+
+## Running the Terraform Configuration
+
+The terraform/ directory creates the two additional managed EC2 instances and a security group. It expects an existing VPC, subnet, Control Node security group, Ubuntu AMI, and EC2 key pair.
+
+1. Copy terraform.tfvars.example to terraform.tfvars and fill in your AWS environment values.
+2. Run the following commands from the terraform directory:
+
+```bash
+terraform init
+terraform validate
+terraform plan
+terraform apply
+```
+
+Add the resulting public IPs to the Control Node inventory. Do not commit terraform.tfvars or terraform.tfstate.
+
+## Useful Ansible Commands
+
+```bash
+ansible-inventory --graph
+ansible all -m ping
+ansible-playbook 02-webserver.yml --syntax-check
 ansible-playbook 02-webserver.yml --check --diff
 ansible-playbook 02-webserver.yml
-ansible-playbook 02-webserver.yml
+ansible-playbook 04-tags.yml --tags deploy
+ansible-playbook 02-webserver.yml --limit web3
+ansible web -m command -a "systemctl is-active nginx"
 ```
 
-For the drift demo, stop Nginx manually on one server:
+---
 
-```bash
-sudo systemctl stop nginx
-```
-
-Then rerun:
-
-```bash
-ansible-playbook 02-webserver.yml
-```
-
-Ansible should restore the service.
-
-
-# Your challenge / tasks
-## Solve it:
-You have 2 Ubuntu servers.
-
-Using Ansible:
-
-1. Install nginx
-2. Install git
-3. Create user "bongodev"
-4. Create /opt/bongodev
-5. Deploy an index.html
-6. Start nginx
-7. Enable nginx on boot
-8. Show different hostname on each webpage
-9. Run the playbook twice
-10. Second run should show changed=0
-
-Then add one evil challenge:
-```bash
-Manually stop Nginx on only Server-2.
-Run your playbook again.
-Can Ansible repair only what is broken?
-```
-
-
-
+<p align="center">Infrastructure as Code with Terraform. Configuration Management with Ansible.</p>
