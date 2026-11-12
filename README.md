@@ -1,5 +1,7 @@
-<p align="center"><img src="https://img.shields.io/badge/ANSIBLE-EE0000?style=for-the-badge&logo=ansible&logoColor=white" alt="Ansible logo"></p>
-<h1 align="center">AWS EC2 Configuration Management with Ansible</h1>
+<p align="center">
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/ansible/ansible-original.svg" alt="Ansible logo" width="120" height="120">
+</p>
+<h1 align="center">Ansible Configuration Management and Automation</h1>
 <p align="center">
 <img src="https://img.shields.io/badge/Ansible-Automation-EE0000?style=flat-square&logo=ansible&logoColor=white">
 <img src="https://img.shields.io/badge/Terraform-Infrastructure-7B42BC?style=flat-square&logo=terraform&logoColor=white">
